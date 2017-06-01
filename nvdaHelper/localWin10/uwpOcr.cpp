@@ -49,16 +49,14 @@ void __stdcall uwpOcr_terminate(UwpOcr* instance) {
 }
 
 void __stdcall uwpOcr_recognize(UwpOcr* instance, const RGBQUAD* image, unsigned int width, unsigned int height) {
-	SoftwareBitmap^ sbmp;
 	unsigned int numBytes = sizeof(RGBQUAD) * width * height;
 	auto buf = ref new Buffer(numBytes);
 	buf->Length = numBytes;
 	BYTE* bytes = getBytes(buf);
 	memcpy(bytes, image, numBytes);
-	sbmp = SoftwareBitmap::CreateCopyFromBuffer(buf, BitmapPixelFormat::Bgra8, width, height, BitmapAlphaMode::Ignore);
+	auto sbmp = SoftwareBitmap::CreateCopyFromBuffer(buf, BitmapPixelFormat::Bgra8, width, height, BitmapAlphaMode::Ignore);
 	task<OcrResult^> ocrTask = create_task(instance->engine->RecognizeAsync(sbmp));
 	ocrTask.then([instance] (OcrResult^ result) {
-		//LOG_ERROR(result->Text->Data());
 		auto lines = result->Lines;
 		auto jLines = ref new JsonArray();
 		for (unsigned short l = 0; l < lines->Size; ++l) {
