@@ -19,6 +19,11 @@ import textInfos.offsets
 import api
 import ui
 import screenBitmap
+import NVDAObjects.window
+import controlTypes
+import browseMode
+import cursorManager
+import eventHandler
 
 #: Registered recognizers.
 recognizers = []
@@ -207,6 +212,73 @@ def ensureInit():
 	selectedRecognizer = recognizers[0]
 	_isInitialized = True
 
+class RecogResultNVDAObject(cursorManager.CursorManager, NVDAObjects.window.Window):
+	"""Fake NVDAObject used to present a recognition result in a cursor manager.
+	This allows the user to read the result with cursor keys, etc.
+	Pressing enter will activate (e.g. click) the text at the cursor.
+	Pressing escape dismisses the recognition result.
+	"""
+
+	role = controlTypes.ROLE_DOCUMENT
+	# Translators: The title of the document used to present the result of content recognition.
+	name = _("Result")
+	treeInterceptor = None
+
+	def __init__(self, result=None, obj=None):
+		self.parent = parent = api.getFocusObject()
+		self.result = result
+		self._selection = self.makeTextInfo(textInfos.POSITION_FIRST)
+		super(RecogResultNVDAObject, self).__init__(windowHandle=parent.windowHandle)
+
+	def makeTextInfo(self, position):
+		# Maintain our own fake selection/caret.
+		if position == textInfos.POSITION_SELECTION:
+			ti = self._selection.copy()
+		elif position == textInfos.POSITION_CARET:
+			ti = self._selection.copy()
+			ti.collapse()
+		else:
+			ti = self.result.makeTextInfo(self, position)
+		return self._patchTextInfo(ti)
+
+	def _patchTextInfo(self, info):
+		# Patch TextInfos so that updateSelection/Caret updates our fake selection.
+		info.updateCaret = lambda: self._setSelection(info, True)
+		info.updateSelection = lambda: self._setSelection(info, False)
+		# Ensure any copies get patched too.
+		oldCopy = info.copy
+		info.copy = lambda: self._patchTextInfo(oldCopy())
+		return info
+
+	def _setSelection(self, textInfo, collapse):
+		self._selection = textInfo.copy()
+		if collapse:
+			self._selection.collapse()
+
+	def setFocus(self):
+		ti = self.parent.treeInterceptor
+		if isinstance(ti, browseMode.BrowseModeDocumentTreeInterceptor):
+			# Normally, when entering browse mode from a descendant (e.g. dialog),
+			# we want the cursor to move to the focus (#3145).
+			# However, we don't want this for math, as math isn't focusable.
+			ti._enteringFromOutside = True
+		eventHandler.executeEvent("gainFocus", self)
+
+	def script_activatePosition(self, gesture):
+		self._selection.activate()
+	# Translators: Describes a command.
+	script_activatePosition.__doc__ = _("Activates the text at the cursor if possible")
+
+	def script_exit(self, gesture):
+		eventHandler.executeEvent("gainFocus", self.parent)
+	# Translators: Describes a command.
+	script_exit.__doc__ = _("Dismiss the recognition result")
+
+	__gestures = {
+		"kb:enter": "activatePosition",
+		"kb:escape": "exit",
+	}
+
 #: Keeps track of the recognition in progress, if any.
 _activeRecog = None
 def recognizeNavigatorObject():
@@ -236,8 +308,5 @@ def _recogOnResult(result):
 		# Translators: Reported when recognition (e.g. OCR) fails.
 		ui.message(_("Recognition failed"))
 		return
-	nav = api.getNavigatorObject()
-	nav.makeTextInfo = lambda position: result.makeTextInfo(nav, position)
-	api.setReviewPosition(nav.makeTextInfo(textInfos.POSITION_FIRST))
-	# Translators: Reported when recognition (e.g. OCR) is complete.
-	ui.message(_("Done"))
+	resObj = RecogResultNVDAObject(result=result)
+	resObj.setFocus()
