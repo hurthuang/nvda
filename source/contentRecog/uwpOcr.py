@@ -16,10 +16,15 @@ DLL_FILE = ur"lib\nvdaHelperLocalWin10.dll"
 
 class UwpOcr(ContentRecognizer):
 
+	def getResizeFactor(self, width, height):
+		if width < 100 or height < 100:
+			return 4
+		return 1
+
 	def __init__(self):
 		self._dll = ctypes.windll[DLL_FILE]
 
-	def recognize(self, pixels, left, top, width, height, onResult):
+	def recognize(self, pixels, width, height, coordConv, onResult):
 		self._onResult = onResult
 		@uwpOcr_Callback
 		def callback(result):
@@ -27,7 +32,7 @@ class UwpOcr(ContentRecognizer):
 			if self._onResult:
 				if result:
 					data = json.loads(result)
-					self._onResult(LinesWordsResult(data, left, top))
+					self._onResult(LinesWordsResult(data, coordConv))
 				else:
 					self._onResult(RuntimeError("UWP OCR failed"))
 			self._dll.uwpOcr_terminate(self._handle)

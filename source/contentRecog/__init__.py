@@ -36,7 +36,19 @@ class ContentRecognizer(object):
 	"""Implementation of a content recognizer.
 	"""
 
-	def recognize(self, pixels, left, top, width, height, onResult):
+	def getResizeFactor(self, width, height):
+		"""Return the factor by which an image must be resized
+		before it is passed to this recognizer.
+		@param width: The width of the image in pixels.
+		@type width: int
+		@param height: The height of the image in pixels.
+		@type height: int
+		@return: The resize factor, C{1} for no resizing.
+		@rtype: int or float
+		"""
+		return 1
+
+	def recognize(self, pixels, width, height, coordConverter, onResult):
 		"""Asynchronously recognize content from an image.
 		This method should not block.
 		Only one recognition can be performed at a time.
@@ -47,16 +59,14 @@ class ContentRecognizer(object):
 			i.e. four bytes per pixel in the order blue, green, red, alpha.
 			However, the alpha channel should be ignored.
 		@type pixels: Two dimensional array (y then x) of L{winGDI.RGBQUAD}
-		@param left: The x screen coordinate of the upper-left corner of the image.
-			This should be added to any x coordinates returned to NVDA.
-		@type left: int
-		@param top: The y screen coordinate of the upper-left corner of the image.
-			This should be added to any y coordinates returned to NVDA.
-		@type top: int
 		@param width: The width of the image in pixels.
 		@type width: int
 		@param height: The height of the image in pixels.
 		@type height: int
+		@param coordConverter: The converter to convert coordinates
+			in the supplied image to screen coordinates.
+			This should be used when returning coordinates to NVDA.
+		@type coordConverter: L{ResultCoordConverter}
 		@param onResult: A callable which takes a L{RecognitionResult} (or an exception on failure) as its only argument.
 		@type onResult: callable
 		"""
@@ -66,6 +76,39 @@ class ContentRecognizer(object):
 		"""Cancel the recognition in progress (if any).
 		"""
 		raise NotImplementedError
+
+class ResultCoordConverter(object):
+	"""Converts coordinates in a recognition result to screen coordinates.
+	An image captured for recognition can begin at any point on the screen.
+	However, the image is cropped when passed to the recognizer.
+	Also, some recognizers need the image to be resized prior to recognition.
+	This converter converts coordinates in the recognized image
+	to screen coordinates suitable to be returned to NVDA;
+	e.g. in order to route the mouse.
+	"""
+
+	def __init__(self, left, top, resizeFactor):
+		"""
+		@param left: The x screen coordinate of the upper-left corner of the image.
+		@type left: int
+		@param top: The y screen coordinate of the upper-left corner of the image.
+		@type top: int
+		@param resizeFactor: The factor by which the image was resized for recognition.
+		@type resizeFactor: int or float
+		"""
+		self.left = left
+		self.top = top
+		self.resizeFactor = resizeFactor
+
+	def convertX(self, x):
+		"""Convert an x coordinate in the result to an x coordinate on the screen.
+		"""
+		return self.left + int(x / self.resizeFactor)
+
+	def convertY(self, y):
+		"""Convert an x coordinate in the result to an x coordinate on the screen.
+		"""
+		return self.top + int(y / self.resizeFactor)
 
 class RecognitionResult(object):
 	"""Provides access to the result of recognition by a recognizer.
@@ -96,7 +139,7 @@ class LinesWordsResult(RecognitionResult):
 	Several OCR engines produce output in a format which can be easily converted to this.
 	"""
 
-	def __init__(self, data, left, top):
+	def __init__(self, data, coordConverter):
 		"""Constructor.
 		@param data: The lines/words data structure. For example:
 			[
@@ -110,16 +153,13 @@ class LinesWordsResult(RecognitionResult):
 				]
 			]
 		@type data: list of lists of dicts
-		@param left: The x screen coordinate of the upper-left corner of the image.
-			This should be added to any x coordinates returned to NVDA.
-		@type left: int
-		@param top: The y screen coordinate of the upper-left corner of the image.
-			This should be added to any y coordinates returned to NVDA.
-		@type top: int
+		@param coordConverter: The converter to convert coordinates
+			in the supplied image to screen coordinates.
+			This should be used when returning coordinates to NVDA.
+		@type coordConverter: L{ResultCoordConverter}
 		"""
 		self.data = data
-		self.left = left
-		self.top = top
+		self.coordConverter = coordConverter
 		self._textList = []
 		self.textLen = 0
 		#: End offsets for each line.
@@ -140,8 +180,8 @@ class LinesWordsResult(RecognitionResult):
 					self._textList.append(" ")
 					self.textLen += 1
 				self.words.append(LwrWord(self.textLen,
-					self.left + word["x"],
-					self.top + word["y"]))
+					self.coordConverter.convertX(word["x"]),
+					self.coordConverter.convertY(word["y"])))
 				text = word["text"]
 				self._textList.append(text)
 				self.textLen += len(text)
@@ -296,10 +336,14 @@ def recognizeNavigatorObject():
 	ui.message(_("Recognizing"))
 	nav = api.getNavigatorObject()
 	left, top, width, height = nav.location
-	sb = screenBitmap.ScreenBitmap(width, height)
-	pixels = sb.captureImage(left, top, width, height)
 	_activeRecog = selectedRecognizer
-	_activeRecog.recognize(pixels, left, top, width, height, _recogOnResult)
+	resize = _activeRecog.getResizeFactor(width, height)
+	coordConv = ResultCoordConverter(left, top, resize)
+	destWidth = int(width * resize)
+	destHeight = int(height * resize)
+	sb = screenBitmap.ScreenBitmap(destWidth, destHeight)
+	pixels = sb.captureImage(left, top, width, height)
+	_activeRecog.recognize(pixels, destWidth, destHeight, coordConv, _recogOnResult)
 
 def _recogOnResult(result):
 	global _activeRecog
