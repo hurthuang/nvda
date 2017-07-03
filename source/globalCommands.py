@@ -2005,12 +2005,12 @@ class GlobalCommands(ScriptableObject):
 	# Translators: Describes a command.
 	script_interactWithMath.__doc__ = _("Begins interaction with math content")
 
-	def script_recognizeNavigatorObject(self, gesture):
-		import contentRecog
-		contentRecog.ensureInit()
-		contentRecog.recognizeNavigatorObject()
+	def script_recognizeWithUwpOcr(self, gesture):
+		from contentRecog import uwpOcr, recogUi
+		recog = uwpOcr.UwpOcr()
+		recogUi.recognizeNavigatorObject(recog)
 	# Translators: Describes a command.
-	script_recognizeNavigatorObject.__doc__ = _("Recognize the content of the current navigator object")
+	script_recognizeWithUwpOcr.__doc__ = _("Recognize the content of the current navigator object with Windows 10 OCR")
 
 	__gestures = {
 		# Basic
@@ -2191,7 +2191,7 @@ class GlobalCommands(ScriptableObject):
 		"kb:NVDA+control+f3": "reloadPlugins",
 		"kb(desktop):NVDA+control+f2": "test_navigatorDisplayModelText",
 		"kb:NVDA+alt+m": "interactWithMath",
-		"kb:NVDA+r": "recognizeNavigatorObject",
+		"kb:NVDA+r": "recognizeWithUwpOcr",
 	}
 
 #: The single global commands instance.
