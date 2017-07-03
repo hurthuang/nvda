@@ -20,6 +20,7 @@ import browseMode
 import cursorManager
 import eventHandler
 import textInfos
+from logHandler import log
 from . import ResultCoordConverter
 
 class RecogResultNVDAObject(cursorManager.CursorManager, NVDAObjects.window.Window):
@@ -75,7 +76,10 @@ class RecogResultNVDAObject(cursorManager.CursorManager, NVDAObjects.window.Wind
 		eventHandler.executeEvent("gainFocus", self)
 
 	def script_activatePosition(self, gesture):
-		self._selection.activate()
+		try:
+			self._selection.activate()
+		except NotImplementedError:
+			log.debugWarning("Result TextInfo does not implement activate")
 	# Translators: Describes a command.
 	script_activatePosition.__doc__ = _("Activates the text at the cursor if possible")
 

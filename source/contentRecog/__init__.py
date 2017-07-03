@@ -218,3 +218,39 @@ class LwrTextInfo(textInfos.offsets.OffsetsTextInfo):
 				break
 			word = nextWord
 		return textInfos.Point(word.left, word.top)
+
+class SimpleTextResult(RecognitionResult):
+	"""A L{RecognitionResult} which presents a simple text string.
+	NVDA calculates words and lines itself based on the text;
+	e.g. a new line character breaks a line.
+	Routing the mouse, etc. cannot be supported.
+	This should only be used if the recognizer only returns text
+	and no coordinate information.
+	"""
+
+	def __init__(self, text):
+		self.text = text
+
+	def makeTextInfo(self, obj, position):
+		return SimpleResultTextInfo(obj, position, self)
+
+class SimpleResultTextInfo(textInfos.offsets.OffsetsTextInfo):
+	"""TextInfo used by L{SimpleTextResult}.
+	This should only be instantiated by L{SimpleTextResult}.
+	"""
+
+	def __init__(self, obj, position, result):
+		self.result = result
+		super(SimpleResultTextInfo, self).__init__(obj, position)
+
+	def copy(self):
+		return self.__class__(self.obj, self.bookmark, self.result)
+
+	def _getStoryText(self):
+		return self.result.text
+
+	def _getStoryLength(self):
+		return len(self.result.text)
+
+	def _getStoryText(self):
+		return self.result.text
