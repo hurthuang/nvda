@@ -2007,6 +2007,10 @@ class GlobalCommands(ScriptableObject):
 
 	def script_recognizeWithUwpOcr(self, gesture):
 		from contentRecog import uwpOcr, recogUi
+		if not uwpOcr.isAvailable():
+			# Translators: Reported when Windows 10 OCR is not available.
+			ui.message(_("Windows 10 OCR not available"))
+			return
 		recog = uwpOcr.UwpOcr()
 		recogUi.recognizeNavigatorObject(recog)
 	# Translators: Describes a command.

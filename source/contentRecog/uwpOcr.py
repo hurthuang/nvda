@@ -7,12 +7,17 @@
 """Recognition of text using the UWP OCR engine included in Windows 10.
 """
 
+import os
 import ctypes
 import json
 from . import ContentRecognizer, LinesWordsResult
 
+DATA_PATH = os.path.expandvars(r"$windir\OCR")
 uwpOcr_Callback = ctypes.CFUNCTYPE(None, ctypes.c_wchar_p)
 DLL_FILE = ur"lib\nvdaHelperLocalWin10.dll"
+
+def isAvailable():
+	return os.path.isdir(DATA_PATH)
 
 class UwpOcr(ContentRecognizer):
 
