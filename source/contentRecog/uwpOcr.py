@@ -10,11 +10,11 @@
 import os
 import ctypes
 import json
+import NVDAHelper
 from . import ContentRecognizer, LinesWordsResult
 
 DATA_PATH = os.path.expandvars(r"$windir\OCR")
 uwpOcr_Callback = ctypes.CFUNCTYPE(None, ctypes.c_wchar_p)
-DLL_FILE = ur"lib\nvdaHelperLocalWin10.dll"
 
 def isAvailable():
 	return os.path.isdir(DATA_PATH)
@@ -27,7 +27,7 @@ class UwpOcr(ContentRecognizer):
 		return 1
 
 	def __init__(self):
-		self._dll = ctypes.windll[DLL_FILE]
+		self._dll = NVDAHelper.getHelperLocalWin10Dll()
 
 	def recognize(self, pixels, width, height, coordConv, onResult):
 		self._onResult = onResult
